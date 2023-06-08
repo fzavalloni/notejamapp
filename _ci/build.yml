@@ -1,0 +1,43 @@
+parameters:
+  vmImage: ''
+  pythonVersion: 3.7
+
+jobs:
+- job: build
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  steps:
+
+  - checkout: self
+    clean: true
+
+  # Uniting tests is not working in the pipeline
+  # Issues with the in memory DB
+  # It needs further investigation
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.7'
+      displayName: 'Use Python 3.7'
+  - script: |
+        python -m venv antenv
+        source antenv/bin/activate
+        python -m pip install --upgrade pip
+        pip install setup
+        pip install -r requirements.txt
+              
+    workingDirectory: '$(Build.SourcesDirectory)'
+    displayName: "Python requisites"
+
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: '$(Build.SourcesDirectory)'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/Application.zip'
+      replaceExistingArchive: true
+      verbose:
+
+  - publish: '$(Build.ArtifactStagingDirectory)'
+    artifact: application
+

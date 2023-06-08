@@ -1,0 +1,49 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "serverName": {
+            "type": "string"
+        },
+        "serverLocation": {
+            "type": "string"
+        },
+        "adminUserAccount":{
+            "type": "string"
+        },
+        "adminUserPassword":{
+            "type": "string"
+        }
+    },
+    "variables": {
+        "serverLocation": "[toLower(replace(parameters('serverLocation'),' ', ''))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2021-02-01-preview",
+            "name": "[parameters('serverName')]",
+            "location": "[variables('serverLocation')]",
+            "kind": "v12.0",
+            "properties": {
+                "administratorLogin": "[parameters('adminUserAccount')]",
+                "administratorLoginPassword": "[parameters('adminUserPassword')]",
+                "version": "12.0",
+                "publicNetworkAccess": "Enabled",
+                "restrictOutboundNetworkAccess": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/firewallRules",
+            "apiVersion": "2021-02-01-preview",
+            "name": "[concat(parameters('serverName'), '/AllowAllWindowsAzureIps')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('serverName'))]"
+            ],
+            "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+            }
+        }
+    ]
+}

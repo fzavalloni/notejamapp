@@ -1,0 +1,62 @@
+name: $(date:yyyy.M.d)-$(Build.SourceBranchName)-$(date:HHmm)
+
+parameters:
+- name: deployTo
+  displayName: Deploy to (dev) environment
+  type: string
+  default: dev001
+  values:
+  - dev001
+  - dev002
+  - dev003
+  - dev004
+  - dev005
+  - dev006
+  - dev007
+  - dev008
+  - dev009
+  - dev010
+
+trigger:
+  branches:
+    include:
+    - "*"
+
+variables:
+  - group: Pipeline
+  - group: SQLCredentials
+
+stages:
+- stage: build
+  jobs:
+  - template: _ci/build.yml
+    parameters:
+      vmImage: $(vmImage)
+
+- stage: deploy_dev
+  jobs:
+  - template: _ci/deploy.yml
+    parameters:
+      vmImage: $(vmImage)
+      connectedServiceName: DEV-NotejamApp-SPN
+      resourceGroup: notejamapp-${{ parameters.deployTo }}-rsg
+      sharedResourceGroupName: SharedResources
+      appServiceName: notejamapp-${{ parameters.deployTo }}-app
+      environment: dev
+      serverName: notejamserver-dev
+      location: 'West Europe'
+
+- stage: deploy_prd
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - template: _ci/deploy.yml
+    parameters:
+      vmImage: $(vmImage)
+      connectedServiceName: PRD-NotejamApp-SPN
+      resourceGroup: notejamapp-prd001-rsg
+      sharedResourceGroupName: SharedResources
+      appServiceName: notejamapp-prd001-app
+      environment: prd
+      serverName: notejamserver-prd
+      location: 'West Europe'
+

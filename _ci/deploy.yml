@@ -1,0 +1,96 @@
+parameters:
+  - name: vmImage
+    type: string
+  - name: connectedServiceName
+    type: string
+  - name: location
+    type: string
+  - name: environment
+    type: string
+  - name: resourceGroup
+    type: string
+  - name: appServiceName
+    type: string
+  - name: serverName
+    type: string
+  - name: sharedResourceGroupName
+    type: string
+
+jobs:
+  - deployment: deploy
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    environment: ${{ parameters.environment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - download: current
+            artifact: application
+
+          - task: AzureResourceGroupDeployment@2
+            displayName: Deploy Azure Resources
+            inputs:
+              azureSubscription: ${{ parameters.connectedServiceName }}
+              resourceGroupName: ${{ parameters.resourceGroup }}
+              location: ${{ parameters.location }}
+              csmFile: $(Build.SourcesDirectory)/templates/azuredeploy.json
+              csmParametersFile: $(Build.SourcesDirectory)/templates/azuredeploy.parameters.${{ parameters.environment }}.json
+              overrideParameters: '-siteAppName ${{ parameters.appServiceName }}'
+
+          - task: AzureResourceGroupDeployment@2
+            displayName: Deploy Sql Database
+            inputs:
+              azureSubscription: ${{ parameters.connectedServiceName }}
+              deploymentOutputs: sqlOutputs
+              resourceGroupName: ${{ parameters.sharedResourceGroupName }}
+              location: ${{ parameters.location }}
+              csmFile: $(Build.SourcesDirectory)/templates/azuredeploy_db.json
+              csmParametersFile: $(Build.SourcesDirectory)/templates/azuredeploy_db.parameters.${{ parameters.environment }}.json
+              overrideParameters: >
+                -databaseName "${{ parameters.appServiceName }}"
+                -serverLocation "${{ parameters.location }}"
+                -serverName "${{ parameters.serverName }}"
+
+          - task: AzureRmWebAppDeployment@4
+            displayName: Deploy Application  
+            inputs:
+              azureSubscription: ${{ parameters.connectedServiceName }}
+              appType: application
+              WebAppName: ${{ parameters.appServiceName }}
+              packageForLinux: '$(Pipeline.Workspace)/application/*.zip'
+              enableCustomDeployment: true
+              DeploymentType: zipDeploy
+              TakeAppOfflineFlag: true
+
+          # Ideally the permissions in the SQL server should be added to the Application Identity and only to the
+          # specific database. We are using the admin accounts just for demo purposes
+          - task: AzureAppServiceSettings@1
+            displayName: Set Connection String
+            inputs:
+              azureSubscription: ${{ parameters.connectedServiceName }}
+              appName: ${{ parameters.appServiceName }}
+              connectionStrings: |
+                [
+                  {
+                    "name": "AZURE_APP_CONFIG_CONNECTION_STRING",
+                    "value": "DRIVER=ODBC Driver 17 for SQL Server;SERVER=${{ parameters.serverName }}.database.windows.net;DATABASE=${{ parameters.appServiceName }};UID=$(Username);PWD=$(Password)",
+                    "type": "SQLServer",
+                    "slotSetting": false
+                  }
+                ]
+
+          - task: AzureAppServiceManage@0
+            displayName: Appplication Restart
+            inputs:
+              azureSubscription: ${{ parameters.connectedServiceName }}
+              action: 'Restart Azure App Service'
+              webAppName: ${{ parameters.appServiceName }} 
+
+
+
+        
+        
+        
+

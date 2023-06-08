@@ -1,0 +1,289 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "siteAppName": {
+            "type": "String"
+        },
+        "region":{
+            "defaultValue": "West Europe",
+            "type": "string"
+        },
+        "sku":{
+            "defaultValue": {
+                "name": "B1",
+                "tier": "Basic",
+                "size": "B1",
+                "family": "B",
+                "capacity": 1
+            },
+            "type": "object"
+        },
+        "ipSecurityRestrictions":{
+            "defaultValue": 
+            {
+                "ipAddress": "Any",
+                "action": "Allow",
+                "priority": 1,
+                "name": "Allow all",
+                "description": "Allow all access"
+            },
+            "type": "object"
+        },
+        "scmIpSecurityRestrictions":{
+            "defaultValue": 
+            {
+                "ipAddress": "Any",
+                "action": "Allow",
+                "priority": 1,
+                "name": "Allow all",
+                "description": "Allow all access"
+            },
+            "type": "object"
+        },
+        "platform":{
+            "allowedValues": ["linux", "windows"],
+            "defaultValue": "linux",
+            "type": "string"
+        },
+        "runtime":{
+            "type": "string",
+            "defaultValue": "PYTHON|3.7"
+        },
+        "minimumCapacity": {
+            "type": "int",
+            "defaultValue": 2,
+            "metadata": {
+                "description": "The minimum capacity.  Autoscale engine will ensure the instance count is at least this value."
+            }
+        },
+        "maximumCapacity": {
+            "type": "int",
+            "defaultValue": 5,
+            "metadata": {
+                "description": "The maximum capacity.  Autoscale engine will ensure the instance count is not greater than this value."
+            }
+        },
+        "defaultCapacity": {
+            "type": "int",
+            "defaultValue": 5,
+            "metadata": {
+                "description": "The default capacity.  Autoscale engine will preventively set the instance count to be this value if it can not find any metric data."
+            }
+        },
+        "metricName": {
+            "type": "string",
+            "defaultValue": "CpuPercentage",
+            "metadata": {
+                "description": "The metric name."
+            }
+        },
+        "metricThresholdToScaleOut": {
+            "type": "int",
+            "defaultValue": 60,
+            "metadata": {
+                "description": "The metric upper threshold.  If the metric value is above this threshold then autoscale engine will initiate scale out action."
+            }
+        },
+        "metricThresholdToScaleIn": {
+            "type": "int",
+            "defaultValue": 20,
+            "metadata": {
+                "description": "The metric lower threshold.  If the metric value is below this threshold then autoscale engine will initiate scale in action."
+            }
+        },
+        "changePercentScaleOut": {
+            "type": "int",
+            "defaultValue": 20,
+            "metadata": {
+                "description": "The percentage to increase the instance count when autoscale engine is initiating scale out action."
+            }
+        },
+        "changePercentScaleIn": {
+            "type": "int",
+            "defaultValue": 10,
+            "metadata": {
+                "description": "The percentage to decrease the instance count when autoscale engine is initiating scale in action."
+            }
+        },
+        "autoscaleEnabled": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "A boolean to indicate whether the autoscale policy is enabled or disabled."
+            }
+        }
+    },
+    "variables": {
+        "appServicePlanName": "[toLower(concat(parameters('siteAppName'), '-spl'))]",
+        "settingName": "[concat(toLower(variables('appServicePlanName')), '-setting')]",
+        "targetResourceId": "[resourceId('Microsoft.Web/serverFarms/', variables('appServicePlanName'))]",
+        "logAnalyticsName": "[toLower(concat(parameters('siteAppName'), '-log'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[variables('appServicePlanName')]",
+            "location": "[parameters('region')]",
+            "sku": "[parameters('sku')]",
+            "kind": "[parameters('platform')]",
+            "properties": {
+                "perSiteScaling": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": true,
+                "isXenon": false,
+                "hyperV": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "name": "[parameters('siteAppName')]",
+            "location": "[parameters('region')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+            ],
+            "kind": "[concat('app,', parameters('platform'))]",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('siteAppName'), '.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('siteAppName'), '.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "reserved": true,
+                "isXenon": false,
+                "hyperV": false,
+                "siteConfig": {
+                    "numberOfWorkers": 1,
+                    "linuxFxVersion": "[parameters('runtime')]",
+                    "alwaysOn": false,
+                    "http20Enabled": true
+                },
+                "scmSiteAlsoStopped": false,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "hostNamesDisabled": false,
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "httpsOnly": true,
+                "redundancyMode": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('siteAppName'), '/web')]",
+            "location": "[parameters('region')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('siteAppName'))]"
+            ],
+            "properties": {
+                "numberOfWorkers": 1,
+                "linuxFxVersion": "[parameters('runtime')]",
+                "ipSecurityRestrictions": "[parameters('ipSecurityRestrictions')]",
+                "scmIpSecurityRestrictions": "[parameters('scmIpSecurityRestrictions')]"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('siteAppName'), '/', parameters('siteAppName'), '.azurewebsites.net')]",
+            "location": "[parameters('region')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('siteAppName'))]"
+            ],
+            "properties": {
+                "siteName": "parameters('siteAppName')"
+            }
+        },
+        {
+            "type": "Microsoft.Insights/autoscalesettings",
+            "condition": "[parameters('autoscaleEnabled')]",
+            "name": "[variables('settingName')]",
+            "dependsOn": [
+              "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+            ],
+            "apiVersion": "2014-04-01",
+            "location": "[parameters('region')]",
+            "properties": {
+              "profiles": [
+                {
+                  "name": "DefaultAutoscaleProfile",
+                  "capacity": {
+                    "minimum": "[parameters('minimumCapacity')]",
+                    "maximum": "[parameters('maximumCapacity')]",
+                    "default": "[parameters('defaultCapacity')]"
+                  },
+                  "rules": [
+                    {
+                      "metricTrigger": {
+                        "metricName": "[parameters('metricName')]",
+                        "metricResourceUri": "[variables('targetResourceId')]",
+                        "timeGrain": "PT5M",
+                        "statistic": "Average",
+                        "timeWindow": "PT10M",
+                        "timeAggregation": "Average",
+                        "operator": "GreaterThan",
+                        "threshold": "[parameters('metricThresholdToScaleOut')]"
+                      },
+                      "scaleAction": {
+                        "direction": "Increase",
+                        "type": "PercentChangeCount",
+                        "value": "[parameters('changePercentScaleOut')]",
+                        "cooldown": "PT10M"
+                      }
+                    },
+                    {
+                      "metricTrigger": {
+                        "metricName": "[parameters('metricName')]",
+                        "metricResourceUri": "[variables('targetResourceId')]",
+                        "timeGrain": "PT5M",
+                        "statistic": "Average",
+                        "timeWindow": "PT10M",
+                        "timeAggregation": "Average",
+                        "operator": "LessThan",
+                        "threshold": "[parameters('metricThresholdToScaleIn')]"
+                      },
+                      "scaleAction": {
+                        "direction": "Decrease",
+                        "type": "PercentChangeCount",
+                        "value": "[parameters('changePercentScaleIn')]",
+                        "cooldown": "PT10M"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "enabled": "[parameters('autoscaleEnabled')]",
+              "targetResourceUri": "[variables('targetResourceId')]"
+            }   
+        },
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "apiVersion": "2017-03-15-preview",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+              ],
+            "name": "[variables('logAnalyticsName')]",
+            "location": "[parameters('region')]",
+            "properties": {
+                "sku": {
+                    "name": "pergb2018"
+                }
+            }
+        }
+    ]
+}

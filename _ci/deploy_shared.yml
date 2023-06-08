@@ -1,0 +1,39 @@
+parameters:
+  - name: vmImage
+    type: string
+  - name: connectedServiceName
+    type: string
+  - name: location
+    type: string
+  - name: resourceGroup
+    type: string
+  - name: serverName
+    type: string
+  - name: environment
+    type: string
+
+jobs:
+  - deployment: deploy
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    environment: ${{ parameters.environment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          - task: AzureResourceGroupDeployment@2
+            displayName: Deploy Sql Server
+            inputs:
+              azureSubscription: ${{ parameters.connectedServiceName }}
+              deploymentOutputs: sqlOutputs
+              resourceGroupName: ${{ parameters.resourceGroup }}
+              location: ${{ parameters.location }}
+              csmFile: $(Build.SourcesDirectory)/templates/azuredeploy_sql.json
+              overrideParameters: >
+                -adminUserPassword $(Password)
+                -adminUserAccount $(Username)
+                -serverLocation "${{ parameters.location }}"
+                -serverName "${{ parameters.serverName }}"
+

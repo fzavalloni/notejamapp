@@ -1,0 +1,28 @@
+
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "collation": {
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+        },
+        "tier":{
+            "value": "Basic"
+        },
+        "skuName":{
+            "value": "Basic"
+        },
+        "longTermRetentionEnabled":{
+            "value": true
+        },
+        "weeklyRetentionLongTermRetention":{
+            "value": "P6M"
+        },
+        "monthlyRetentionLongTermRetention":{
+            "value": "PT0S"
+        },
+        "yearlyRetentionLongTermRetention":{
+            "value": "P3Y"
+        }
+    }
+}

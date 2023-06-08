@@ -1,0 +1,86 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "collation": {
+            "type": "string"
+        },
+        "databaseName": {
+            "type": "string"
+        },
+        "tier": {
+            "type": "string"
+        },
+        "skuName": {
+            "type": "string"
+        },
+        "serverName": {
+            "type": "string"
+        },
+        "serverLocation": {
+            "type": "string"
+        },        
+        "zoneRedundant": {
+            "type": "bool",
+            "defaultValue": false
+        },
+        "numberOfReplicas": {
+            "type": "int",
+            "defaultValue": 0
+        },
+        "longTermRetentionEnabled":{
+            "type": "bool",
+            "defaultValue": false
+        },
+        "weeklyRetentionLongTermRetention":{
+            "type": "string",
+            "defaultValue": "P6M"
+        },
+        "monthlyRetentionLongTermRetention":{
+            "type": "string",
+            "defaultValue": "PT0S"
+        },
+        "yearlyRetentionLongTermRetention":{
+            "type": "string",
+            "defaultValue": "P3Y"
+        }
+    },
+    "variables": {
+        "subscriptionId": "[subscription().subscriptionId]",
+        "serverLocation": "[toLower(replace(parameters('serverLocation'),' ', ''))]"
+    },
+
+    "resources": [
+        {
+            "type": "Microsoft.Sql/servers/databases",
+            "apiVersion": "2021-02-01-preview",
+            "location": "[variables('serverLocation')]",
+            "name": "[concat(parameters('serverName'), '/', parameters('databaseName'))]",
+            "properties": {
+                "collation": "[parameters('collation')]",
+                "zoneRedundant": "[parameters('zoneRedundant')]",
+                "highAvailabilityReplicaCount": "[parameters('numberOfReplicas')]"
+            },
+            "sku": {
+                "name": "[parameters('skuName')]",
+                "tier": "[parameters('tier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases/backupLongTermRetentionPolicies",
+            "condition": "[parameters('longTermRetentionEnabled')]",
+            "apiVersion": "2021-02-01-preview",
+            "name": "[concat(parameters('serverName'), '/', parameters('databaseName'),'/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('serverName'), parameters('databaseName'))]"
+            ],
+            "properties": {
+                "weeklyRetention": "[parameters('weeklyRetentionLongTermRetention')]",
+                "monthlyRetention": "[parameters('monthlyRetentionLongTermRetention')]",
+                "yearlyRetention": "[parameters('yearlyRetentionLongTermRetention')]",
+                "weekOfYear": 1
+            }
+        }
+    ]
+    
+}

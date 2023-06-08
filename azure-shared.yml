@@ -1,0 +1,36 @@
+name: $(date:yyyy.M.d)-$(Build.SourceBranchName)-$(date:HHmm)
+
+trigger:
+  branches:
+    include:
+    - "*"
+
+variables:
+  - group: Pipeline
+  - group: SQLCredentials
+
+stages:
+- stage: deploy_dev
+  jobs:
+  - template: _ci/deploy_shared.yml
+    parameters:
+      vmImage: $(vmImage)
+      connectedServiceName: DEV-NotejamApp-SPN
+      resourceGroup: SharedResources
+      serverName: notejamserver-dev
+      location: 'West Europe'
+      environment: dev
+
+
+- stage: deploy_prd
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - template: _ci/deploy_shared.yml
+    parameters:
+      vmImage: $(vmImage)
+      connectedServiceName: PRD-NotejamApp-SPN
+      resourceGroup: SharedResources
+      serverName: notejamserver-prd
+      location: 'West Europe'
+      environment: prd
+

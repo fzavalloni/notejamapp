@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sku":{
+            "value": {
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
+                "capacity": 1
+            }
+        },
+        "autoscaleEnabled":{
+            "value": true
+        },
+        "minimumCapacity": {
+            "value": 1
+        },
+        "maximumCapacity": {
+            "value": 4
+        },
+        "defaultCapacity": {
+            "value": 1
+        },
+        "changePercentScaleOut": {
+            "value": 90
+        },
+        "changePercentScaleIn": {
+            "value": 60
+        }
+    }
+}
